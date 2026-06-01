@@ -1,12 +1,17 @@
+spring:
+  application:
+    name: contentflow-backend
+  autoconfigure:
+      exclude:
+        - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
 
-  spring:
-    application:
-      name: contentflow-backend
-    datasource:
-      url: jdbc:mysql://localhost:3306/contentflow?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
-      username: root
-      password:
-      driver-class-name: com.mysql.cj.jdbc.Driver
+  datasource:
+    url: jdbc:mysql://localhost:3306/contentflow?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
     redis:
       host: localhost
       port: 6379
@@ -17,59 +22,62 @@
           max-active: 8
           max-idle: 8
           min-idle: 0
-    rabbitmq:
-      host: localhost
-      port: 5672
-      username: guest
-      password: guest
-      virtual-host: /
-      listener:
-        simple:
-          retry:
-            enabled: true
-            max-attempts: 3
-            initial-interval: 1000ms
-            multiplier: 2.0
-    servlet:
-      multipart:
-        max-file-size: 10MB
-        max-request-size: 20MB
 
-  server:
-    port: 8080
-    servlet:
-      context-path: /api
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    connection-timeout: 5000ms
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+          multiplier: 2.0
 
-  mybatis-plus:
-    mapper-locations: classpath*:/mapper/**/*.xml
-    type-aliases-package: com.contentflow.*.entity
-    global-config:
-      db-config:
-        id-type: auto
-        logic-delete-field: deleted
-        logic-delete-value: 1
-        logic-not-delete-value: 0
-    configuration:
-      map-underscore-to-camel-case: true
-      log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
 
-  jwt:
-    secret: contentflow-secret-key-must-be-32-characters-or-more-for-hs256
-    expiration: 86400000 # 24 hours
+server:
+  port: 8080
+  servlet:
+    context-path: /api
 
-  minio:
-    endpoint: http://localhost:9000
-    access-key: minioadmin
-    secret-key: minioadmin
-    bucket-name: contentflow
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.contentflow.*.entity
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
-  ai:
-    openai:
-      api-key: sk-96475d38a5304d399f0f662e1661fedb
-      model: deepseek-v4-flash[1m]
-      max-tokens: 1000
-      temperature: 0.7
+jwt:
+  secret: contentflow-secret-key-must-be-32-characters-or-more-for-hs256
+  expiration: 86400000
 
-  logging:
-    level:
-      com.contentflow: debug
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: contentflow
+
+ai:
+  openai:
+    api-key: your-openai-api-key
+    model: gpt-3.5-turbo
+    max-tokens: 1000
+    temperature: 0.7
+
+logging:
+  level:
+    com.contentflow: debug

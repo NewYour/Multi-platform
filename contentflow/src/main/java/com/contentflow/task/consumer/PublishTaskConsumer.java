@@ -1,4 +1,3 @@
-// com.contentflow.task.consumer.PublishTaskConsumer.java
 package com.contentflow.task.consumer;
 
 import com.alibaba.fastjson2.JSON;
@@ -20,14 +19,14 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
-@Component
-@RequiredArgsConstructor
+//@Component
+@RequiredArgsConstructor  // 生成包含所有 final 字段的构造器
 @Slf4j
 public class PublishTaskConsumer {
 
@@ -35,9 +34,13 @@ public class PublishTaskConsumer {
     private final PublishRecordMapper publishRecordMapper;
     private final ContentMapper contentMapper;
     private final AdaptEngine adaptEngine;
-    private final Map<String, PlatformAdapter> adapterMap = new ConcurrentHashMap<>();
+    private final List<PlatformAdapter> adapters;  // Spring 自动注入所有 PlatformAdapter 实现
 
-    public PublishTaskConsumer(List<PlatformAdapter> adapters) {
+    private Map<String, PlatformAdapter> adapterMap;
+
+    @PostConstruct
+    public void init() {
+        adapterMap = new HashMap<>();
         for (PlatformAdapter adapter : adapters) {
             adapterMap.put(adapter.getPlatform(), adapter);
         }
@@ -48,8 +51,7 @@ public class PublishTaskConsumer {
         long deliveryTag = amqpMessage.getMessageProperties().getDeliveryTag();
         try {
             log.info("消费发布任务: taskId={}", message.getTaskId());
-            // 更新任务状态为处理中
-            PublishTask task = publishTaskMapper.selectById(message.getTaskId());
+            PublishTask task = publishTaskMapper.selectByTaskId(message.getTaskId());
             if (task == null) {
                 log.error("任务不存在: {}", message.getTaskId());
                 channel.basicAck(deliveryTag, false);
@@ -58,28 +60,25 @@ public class PublishTaskConsumer {
             task.setStatus("PROCESSING");
             publishTaskMapper.updateById(task);
 
-            // 获取内容
             Content content = contentMapper.selectById(message.getContentId());
             if (content == null) {
                 throw new RuntimeException("内容不存在");
             }
 
-            // 执行发布到各平台
             Map<String, Object> resultMap = new HashMap<>();
             List<String> platforms = message.getPlatforms();
             boolean allSuccess = true;
+
             for (String platform : platforms) {
                 PlatformAdapter adapter = adapterMap.get(platform);
                 if (adapter == null) {
                     log.warn("不支持的平台: {}", platform);
                     continue;
                 }
-                // 内容适配
                 String adaptedContent = adaptEngine.adaptForPlatform(content.getContentMd(), platform);
-                String rewritten = adaptEngine.rewriteWithAi(adaptedContent, "小红书风格");
-                // 发布
+                // 这里可以调用 AI 重写，示例中省略
                 PublishResult publishResult = adapter.publish(content, null, message.isSimulate());
-                // 保存发布记录
+
                 PublishRecord record = new PublishRecord();
                 record.setTaskId(message.getTaskId());
                 record.setPlatform(platform);
@@ -94,7 +93,6 @@ public class PublishTaskConsumer {
                 }
             }
 
-            // 更新任务最终状态
             task.setStatus(allSuccess ? "SUCCESS" : "PARTIAL_SUCCESS");
             task.setResult(JSON.toJSONString(resultMap));
             publishTaskMapper.updateById(task);
@@ -102,8 +100,7 @@ public class PublishTaskConsumer {
             channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             log.error("处理发布任务失败: {}", message.getTaskId(), e);
-            // 重试
-            boolean requeue = amqpMessage.getMessageProperties().getRedelivered() == false;
+            boolean requeue = !amqpMessage.getMessageProperties().getRedelivered();
             channel.basicNack(deliveryTag, false, requeue);
         }
     }

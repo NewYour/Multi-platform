@@ -1,4 +1,3 @@
-// com.contentflow.content.service.ContentService.java
 package com.contentflow.content.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -28,9 +27,11 @@ public class ContentService {
         content.setSummary(request.getSummary());
         content.setCoverImage(request.getCoverImage());
         content.setStatus(request.getStatus() != null ? request.getStatus() : "DRAFT");
+
         // 转换为HTML
         String html = adaptEngine.markdownToHtml(request.getContentMd());
         content.setContentHtml(html);
+
         contentMapper.insert(content);
         return content;
     }
@@ -46,15 +47,35 @@ public class ContentService {
 
     public Content getContent(Long id) {
         Content content = contentMapper.selectById(id);
-        if (content == null || !content.getUserId().equals(getCurrentUserId())) {
-            throw new BusinessException("内容不存在或无权限");
+        if (content == null) {
+            throw new BusinessException("内容不存在");
+        }
+        if (!content.getUserId().equals(getCurrentUserId())) {
+            throw new BusinessException("无权限访问此内容");
         }
         return content;
     }
 
+    public Content updateContent(Long id, ContentCreateRequest request) {
+        Content content = getContent(id);
+        content.setTitle(request.getTitle());
+        content.setContentMd(request.getContentMd());
+        content.setSummary(request.getSummary());
+        content.setCoverImage(request.getCoverImage());
+        content.setContentHtml(adaptEngine.markdownToHtml(request.getContentMd()));
+        contentMapper.updateById(content);
+        return content;
+    }
+
+    public void deleteContent(Long id) {
+        Content content = getContent(id);
+        contentMapper.deleteById(id);
+    }
+
     private Long getCurrentUserId() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        // 实际应从redis或数据库查询用户ID，简化处理
-        return 1L; // 演示
+        // 从数据库查询用户ID
+        // 简化处理，实际应该从 UserMapper 查询
+        return 1L;
     }
 }
